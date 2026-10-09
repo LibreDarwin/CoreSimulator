@@ -6,11 +6,11 @@
 
 #import <Foundation/Foundation.h>
 
-#import <CoreSimulator/SimServiceContext.h>
-#import <CoreSimulator/SimDeviceSet.h>
-#import <CoreSimulator/SimDevice.h>
-#import <CoreSimulator/SimDeviceType.h>
-#import <CoreSimulator/SimRuntime.h>
+#import "SimServiceContext.h"
+#import "SimDeviceSet.h"
+#import "SimDevice.h"
+#import "SimDeviceType.h"
+#import "SimRuntime.h"
 
 FOUNDATION_EXPORT double CoreSimulatorVersionNumber;
 FOUNDATION_EXPORT const unsigned char CoreSimulatorVersionString[];
