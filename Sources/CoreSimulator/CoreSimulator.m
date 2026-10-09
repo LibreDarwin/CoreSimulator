@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#import <CoreSimulator/CoreSimulator.h>
+#import "CoreSimulator.h"
 
 double CoreSimulatorVersionNumber = 1051.55;
 const unsigned char CoreSimulatorVersionString[] = "1051.55";
