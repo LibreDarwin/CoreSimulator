@@ -1,0 +1,5 @@
+framework module CoreSimulator {
+  umbrella header "CoreSimulator.h"
+  export *
+  module * { export * }
+}
