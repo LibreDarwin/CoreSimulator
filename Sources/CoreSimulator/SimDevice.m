@@ -9,11 +9,4 @@
 
 @implementation SimDevice
 
-@synthesize name = _name;
-@synthesize UDID = _UDID;
-@synthesize deviceTypeIdentifier = _deviceTypeIdentifier;
-@synthesize runtimeIdentifier = _runtimeIdentifier;
-@synthesize state = _state;
-@synthesize isAvailable = _isAvailable;
-
 @end

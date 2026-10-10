@@ -93,7 +93,8 @@ static NSString *CSStateString(NSInteger state) {
         if (d == nil) continue;
         SimDevice *dev = [[SimDevice alloc] init];
         dev.name = d[@"name"] ?: @"Unknown";
-        dev.UDID = [NSUUID UUIDWithUUIDString:d[@"UDID"]];
+        NSString *uuidStr = d[@"UDID"];
+        dev.UDID = uuidStr ? [[NSUUID alloc] initWithUUIDString:uuidStr] : nil;
         dev.deviceTypeIdentifier = d[@"deviceType"] ?: @"";
         dev.runtimeIdentifier = d[@"runtime"] ?: @"";
         dev.state = [d[@"state"] integerValue];
