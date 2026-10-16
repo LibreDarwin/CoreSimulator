@@ -11,6 +11,7 @@
 		A1B2C3D40000000000000002 /* sim_list.c in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000012 /* sim_list.c */; };
 		A1B2C3D40000000000000003 /* sim_list_dispatch.c in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000013 /* sim_list_dispatch.c */; };
 		A1B2C3D40000000000000004 /* sim_ops.c in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000014 /* sim_ops.c */; };
+		A1B2C3D40000000000000005 /* sim_runtime.c in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000017 /* sim_runtime.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -18,6 +19,7 @@
 		A1B2C3D40000000000000012 /* sim_list.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sim_list.c; sourceTree = "<group>"; };
 		A1B2C3D40000000000000013 /* sim_list_dispatch.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sim_list_dispatch.c; sourceTree = "<group>"; };
 		A1B2C3D40000000000000014 /* sim_ops.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sim_ops.c; sourceTree = "<group>"; };
+		A1B2C3D40000000000000017 /* sim_runtime.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sim_runtime.c; sourceTree = "<group>"; };
 		A1B2C3D40000000000000015 /* simctl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = simctl.h; sourceTree = "<group>"; };
 		A1B2C3D40000000000000016 /* simctl */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = simctl; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -64,6 +66,7 @@
 				A1B2C3D40000000000000012 /* sim_list.c */,
 				A1B2C3D40000000000000013 /* sim_list_dispatch.c */,
 				A1B2C3D40000000000000014 /* sim_ops.c */,
+				A1B2C3D40000000000000017 /* sim_runtime.c */,
 				A1B2C3D40000000000000015 /* simctl.h */,
 			);
 			path = simctl;
@@ -129,6 +132,7 @@
 				A1B2C3D40000000000000002 /* sim_list.c in Sources */,
 				A1B2C3D40000000000000003 /* sim_list_dispatch.c in Sources */,
 				A1B2C3D40000000000000004 /* sim_ops.c in Sources */,
+				A1B2C3D40000000000000005 /* sim_runtime.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

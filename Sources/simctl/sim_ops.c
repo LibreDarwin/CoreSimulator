@@ -63,6 +63,18 @@ delegate_to_system(int argc, char **argv, const char *subcommand)
 	return system(cmd);
 }
 
+/*
+ * Delegate the current command (argv[0] is the reimplementation's
+ * binary, argv[1] is the subcommand) to the system simctl binary.
+ * Shared by subcommand implementations that cannot yet run natively.
+ */
+int
+sim_delegate(int argc, char **argv)
+{
+	return delegate_to_system(argc, argv,
+	    (argc > 1 && argv[1] != NULL) ? argv[1] : "simctl");
+}
+
 /* --- create --- */
 int
 sim_create(int argc, char **argv)

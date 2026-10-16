@@ -173,6 +173,9 @@ main(int argc, char **argv)
 			if (strcmp(sub, "list") == 0) {
 				list_usage(stderr);
 				return 0;
+			} else if (strcmp(sub, "runtime") == 0) {
+				runtime_usage(stderr);
+				return 0;
 			}
 		} else {
 			simctl_help();
@@ -224,7 +227,7 @@ main(int argc, char **argv)
 	} else if (strcmp(subcommand, "privacy") == 0) {
 		return delegate_to_system(argc, argv);
 	} else if (strcmp(subcommand, "runtime") == 0) {
-		return delegate_to_system(argc, argv);
+		return sim_runtime(argc, argv);
 	} else if (strcmp(subcommand, "addmedia") == 0 ||
 	    strcmp(subcommand, "icloud_sync") == 0 ||
 	    strcmp(subcommand, "keychain") == 0 ||

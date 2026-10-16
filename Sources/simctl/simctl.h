@@ -42,6 +42,11 @@ extern int  sim_push(int argc, char **argv);
 extern int  sim_rename(int argc, char **argv);
 extern int  sim_clone(int argc, char **argv);
 extern int  sim_openurl(int argc, char **argv);
+extern int  sim_delegate(int argc, char **argv);
+
+/* runtime subcommand (implemented in sim_runtime.c) */
+extern int  sim_runtime(int argc, char **argv);
+extern void runtime_usage(FILE *out);
 
 /* List functions (implemented in sim_list.c / sim_list_dispatch.c) */
 /*

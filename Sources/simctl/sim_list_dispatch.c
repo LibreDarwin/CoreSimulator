@@ -15,6 +15,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -79,6 +80,13 @@ list_type_dispatch(const char *type, int json_mode, int verbose,
 int
 list_dispatch(int argc, char **argv)
 {
+	static struct option longopts[] = {
+		{ "json",              no_argument,       NULL, 'j' },
+		{ "json-fd",           required_argument, NULL, 0x100 },
+		{ "json-output",       required_argument, NULL, 0x101 },
+		{ "no-escape-slashes", no_argument,       NULL, 'e' },
+		{ NULL,                0,                 NULL, 0 }
+	};
 	int json_mode = 0;
 	int verbose = 0;
 	int escape = 1;
@@ -86,44 +94,47 @@ list_dispatch(int argc, char **argv)
 	const char *json_output = NULL;
 	const char *list_type = NULL;
 	const char *term = NULL;
+	int c;
 
-	for (int i = 1; i < argc; i++) {
+	/*
+	 * argv[0] is the "list" subcommand; options begin at index 1.
+	 * getopt_long produces the same diagnostics as the reference
+	 * implementation (including the BSD-style `` `opt' `` quoting).
+	 */
+	optind = 1;
+	while ((c = getopt_long(argc, argv, "jev", longopts, NULL)) != -1) {
+		switch (c) {
+		case 'j':
+			json_mode = 1;
+			break;
+		case 'e':
+			escape = 0;
+			break;
+		case 'v':
+			verbose = 1;
+			break;
+		case 0x100:
+			json_fd = atoi(optarg);
+			if (json_fd <= 0) {
+				fprintf(stderr,
+				    "Invalid file descriptor (%s)\n", optarg);
+				return 1;
+			}
+			break;
+		case 0x101:
+			json_output = optarg;
+			break;
+		default:
+			/* getopt_long already printed the diagnostic. */
+			list_usage(stderr);
+			return LIST_USAGE_EXIT;
+		}
+	}
+
+	for (int i = optind; i < argc; i++) {
 		const char *arg = argv[i];
 
-		if (arg[0] == '-' && arg[1] == '-') {
-			/* Long option */
-			if (strcmp(arg, "--json") == 0) {
-				json_mode = 1;
-			} else if (strcmp(arg, "--no-escape-slashes") == 0) {
-				escape = 0;
-			} else if (strncmp(arg, "--json-fd=", 10) == 0) {
-				json_fd = atoi(arg + 10);
-			} else if (strncmp(arg, "--json-output=", 14) == 0) {
-				json_output = arg + 14;
-			} else {
-				fprintf(stderr,
-				    "simctl: unrecognized option `%s'\n", arg);
-				list_usage(stderr);
-				return LIST_USAGE_EXIT;
-			}
-		} else if (arg[0] == '-' && arg[1] != '\0') {
-			/* Short option cluster */
-			for (const char *p = arg + 1; *p != '\0'; p++) {
-				if (*p == 'j') {
-					json_mode = 1;
-				} else if (*p == 'e') {
-					escape = 0;
-				} else if (*p == 'v') {
-					verbose = 1;
-				} else {
-					fprintf(stderr,
-					    "simctl: invalid option -- %c\n",
-					    *p);
-					list_usage(stderr);
-					return LIST_USAGE_EXIT;
-				}
-			}
-		} else if (list_type == NULL && is_list_type(arg)) {
+		if (list_type == NULL && is_list_type(arg)) {
 			list_type = arg;
 		} else if (term == NULL) {
 			term = arg;
