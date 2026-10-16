@@ -472,13 +472,31 @@ device_match(const char *name, int available, const char *term,
 
 /* --- list devices --- */
 
+/*
+ * Device directory override set by the top-level `--set <path>`
+ * option. When non-NULL it replaces the default per-user devices
+ * directory. `simctl --set <path>` uses <path> as the directory whose
+ * immediate children are device bundles.
+ */
+static const char *device_root_override;
+
+void
+list_set_device_root(const char *path)
+{
+	device_root_override = path;
+}
+
 void
 list_devices(int json_mode, int verbose, const char *term,
     int available_only, int escape)
 {
 	char dev_root[1024];
-	snprintf(dev_root, sizeof dev_root, "%s/%s",
-	    home_dir(), CS_DEVICES_DIR);
+	if (device_root_override != NULL)
+		snprintf(dev_root, sizeof dev_root, "%s",
+		    device_root_override);
+	else
+		snprintf(dev_root, sizeof dev_root, "%s/%s",
+		    home_dir(), CS_DEVICES_DIR);
 
 	DIR *dir = opendir(dev_root);
 	if (dir == NULL) {

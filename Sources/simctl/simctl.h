@@ -54,3 +54,11 @@ extern void list_devicetypes(int json_mode, const char *term, int verbose,
     int escape);
 extern void list_runtimes(int json_mode, const char *term, int escape);
 extern void list_pairs(int json_mode, const char *term, int escape);
+
+/*
+ * Override the directory scanned for devices. `simctl --set <path>`
+ * treats <path> as the directory whose immediate children are device
+ * bundles; this replaces the default
+ * $HOME/Library/Developer/CoreSimulator/Devices root.
+ */
+extern void list_set_device_root(const char *path);

@@ -236,19 +236,29 @@ int
 sim_runtime(int argc, char **argv)
 {
 	const char *op;
+	int idx = 1;
 
 	/*
-	 * argv[0] is the simctl binary and argv[1] is "runtime"; the
-	 * operation is argv[2].
+	 * Skip any leading global options (--set <path>, --profiles
+	 * <path>) to locate the "runtime" token. Global options do not
+	 * affect runtime operations and are not validated here, matching
+	 * the reference implementation.
 	 */
-	if (argc < 3) {
+	while (idx + 1 < argc &&
+	    (strcmp(argv[idx], "--set") == 0 ||
+	     strcmp(argv[idx], "--profiles") == 0))
+		idx += 2;
+
+	/* argv[idx] must be "runtime"; the operation is argv[idx + 1]. */
+	if (idx >= argc || strcmp(argv[idx], "runtime") != 0 ||
+	    idx + 1 >= argc) {
 		runtime_usage(stderr);
 		return RUNTIME_USAGE_EXIT;
 	}
-	op = argv[2];
+	op = argv[idx + 1];
 
 	if (strcmp(op, "list") == 0)
-		return runtime_list(argc - 2, argv + 2);
+		return runtime_list(argc - (idx + 1), argv + (idx + 1));
 
 	/*
 	 * Unknown operations, like the reference implementation, print

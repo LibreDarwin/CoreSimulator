@@ -126,6 +126,8 @@ int
 main(int argc, char **argv)
 {
 	const char *subcommand = NULL;
+	const char *set_path = NULL;
+	const char *profiles_path = NULL;
 	char **sub_args = argv;
 	int sub_argc = argc;
 	int opt_index = 1;
@@ -140,9 +142,11 @@ main(int argc, char **argv)
 	while (opt_index < argc) {
 		if (strcmp(argv[opt_index], "--set") == 0 &&
 		    opt_index + 1 < argc) {
+			set_path = argv[opt_index + 1];
 			opt_index += 2;
 		} else if (strcmp(argv[opt_index], "--profiles") == 0 &&
 		    opt_index + 1 < argc) {
+			profiles_path = argv[opt_index + 1];
 			opt_index += 2;
 		} else if (strcmp(argv[opt_index], "--help") == 0) {
 			simctl_help();
@@ -157,6 +161,16 @@ main(int argc, char **argv)
 		}
 	}
 
+	/*
+	 * The profiles directory is validated globally and before any
+	 * subcommand is dispatched (even `help` and no-subcommand runs).
+	 */
+	if (profiles_path != NULL && access(profiles_path, F_OK) != 0) {
+		fprintf(stderr, "Provided profiles path does not exist: %s\n",
+		    profiles_path);
+		return 1;
+	}
+
 	if (subcommand == NULL) {
 		simctl_help();
 		return 1;
@@ -167,6 +181,13 @@ main(int argc, char **argv)
 	sub_argc = argc - opt_index;
 
 	if (subcommand != NULL && strcmp(subcommand, "help") == 0) {
+		/* `help` consumes the device set, so validate it here. */
+		if (set_path != NULL && access(set_path, F_OK) != 0) {
+			fprintf(stderr,
+			    "Provided set path does not exist: %s\n",
+			    set_path);
+			return 1;
+		}
 		if (sub_argc > 1) {
 			const char *sub = sub_args[1];
 			if (strcmp(sub, "list") == 0) {
@@ -185,6 +206,29 @@ main(int argc, char **argv)
 
 	/* Dispatch to subcommands */
 	if (strcmp(subcommand, "list") == 0) {
+		/*
+		 * A custom profiles directory is not modelled natively, so
+		 * delegate to the reference implementation (the path has
+		 * already been validated above).
+		 */
+		if (profiles_path != NULL)
+			return delegate_to_system(argc, argv);
+
+		/*
+		 * `--set <path>` selects the device directory. The
+		 * reference implementation rejects a missing path before
+		 * doing any work; otherwise <path> replaces the default
+		 * per-user devices directory.
+		 */
+		if (set_path != NULL) {
+			if (access(set_path, F_OK) != 0) {
+				fprintf(stderr,
+				    "Provided set path does not exist: %s\n",
+				    set_path);
+				return 1;
+			}
+			list_set_device_root(set_path);
+		}
 		return list_dispatch(sub_argc, sub_args);
 	} else if (strcmp(subcommand, "runtime") == 0) {
 		return sim_runtime(argc, argv);
