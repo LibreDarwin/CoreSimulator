@@ -203,6 +203,86 @@ runtime_os_display(const char *rt, char *out, size_t outsz)
 		snprintf(out, outsz, "%s", rest);
 }
 
+/*
+ * Runtime profile directories to search when determining whether a
+ * runtime identifier refers to an installed runtime. CoreSimulator
+ * installs runtime bundles into the system profile directory, into a
+ * per-user profile directory, and (for mounted disk images) into the
+ * Volumes hierarchy.
+ */
+static const char *
+runtime_search_dirs(void)
+{
+	static char buf[4096];
+	buf[0] = '\0';
+
+	/*
+	 * The list is rebuilt on each call because the home directory
+	 * can differ between invocations only in tests; keep it simple.
+	 */
+	char home_runtimes[1024];
+	snprintf(home_runtimes, sizeof home_runtimes,
+	    "%s/Library/Developer/CoreSimulator/Profiles/Runtimes",
+	    home_dir());
+
+	snprintf(buf, sizeof buf,
+	    "/Library/Developer/CoreSimulator/Profiles/Runtimes\n"
+	    "%s",
+	    home_runtimes);
+	return buf;
+}
+
+/*
+ * Determine whether a runtime identifier corresponds to an installed
+ * runtime bundle. Returns 1 when a matching .simruntime bundle with the
+ * given CFBundleIdentifier is found, 0 otherwise.
+ */
+static int
+runtime_is_available(const char *runtime_id)
+{
+	if (runtime_id == NULL || runtime_id[0] == '\0')
+		return 0;
+
+	const char *dirs = runtime_search_dirs();
+	char dirlist[4096];
+	snprintf(dirlist, sizeof dirlist, "%s", dirs);
+
+	char *saveptr = NULL;
+	for (char *dir = strtok_r(dirlist, "\n", &saveptr); dir != NULL;
+	    dir = strtok_r(NULL, "\n", &saveptr)) {
+		DIR *rdir = opendir(dir);
+		if (rdir == NULL)
+			continue;
+
+		struct dirent *entry;
+		int found = 0;
+		while ((entry = readdir(rdir)) != NULL) {
+			if (entry->d_name[0] == '.')
+				continue;
+			if (strstr(entry->d_name, ".simruntime") == NULL)
+				continue;
+
+			char info_path[2048];
+			snprintf(info_path, sizeof info_path,
+			    "%s/%s/Contents/Info.plist", dir, entry->d_name);
+
+			char *id = plist_read_string(info_path,
+			    "CFBundleIdentifier");
+			if (id != NULL) {
+				if (strcmp(id, runtime_id) == 0)
+					found = 1;
+				free(id);
+			}
+			if (found)
+				break;
+		}
+		closedir(rdir);
+		if (found)
+			return 1;
+	}
+	return 0;
+}
+
 /* --- list devices --- */
 
 void
@@ -344,6 +424,8 @@ list_devices(int json_mode, int verbose)
 			printf("  \"%s\" : [\n", runtimes[i]);
 			printed_runtime = 1;
 
+			int rt_avail = runtime_is_available(runtimes[i]);
+
 			int first = 1;
 			for (int j = 0; j < count; j++) {
 				if (runtimes[j] == NULL ||
@@ -361,7 +443,8 @@ list_devices(int json_mode, int verbose)
 				    home_user(), udids[j]);
 				printf("      \"udid\" : \"%s\",\n", udids[j]);
 				printf("      \"isAvailable\" : %s,\n",
-				    is_avail[j] ? "true" : "false");
+				    (is_avail[j] && rt_avail) ? "true" :
+				    "false");
 				printf("      \"deviceTypeIdentifier\" : "
 				    "\"%s\",\n",
 				    device_types[j][0] ? device_types[j] :
@@ -393,19 +476,37 @@ list_devices(int json_mode, int verbose)
 			if (seen)
 				continue;
 
-			/* Extract OS display name from runtime identifier */
-			char os_display[64];
-			runtime_os_display(runtimes[i], os_display, sizeof os_display);
+			/*
+			 * When the runtime profile backing this group is
+			 * not installed, simctl labels the group as
+			 * unavailable and annotates each device.
+			 */
+			int rt_avail = runtime_is_available(runtimes[i]);
 
-			printf("-- %s --\n",
-			    os_display[0] ? os_display : "Unknown");
+			if (rt_avail) {
+				/* Extract OS display name from runtime id */
+				char os_display[64];
+				runtime_os_display(runtimes[i], os_display,
+				    sizeof os_display);
+				printf("-- %s --\n",
+				    os_display[0] ? os_display : "Unknown");
+			} else {
+				printf("-- Unavailable: %s --\n", runtimes[i]);
+			}
 
 			for (int j = 0; j < count; j++) {
 				if (runtimes[j] == NULL ||
 				    strcmp(runtimes[j], runtimes[i]) != 0)
 					continue;
-				printf("    %s (%s) (%s) \n",
-				    names[j], udids[j], states_str[j]);
+				if (rt_avail)
+					printf("    %s (%s) (%s)\n",
+					    names[j], udids[j], states_str[j]);
+				else
+					printf("    %s (%s) (%s) "
+					    "(unavailable, runtime profile "
+					    "not found using \"System\" "
+					    "match policy)\n",
+					    names[j], udids[j], states_str[j]);
 			}
 		}
 	}
@@ -435,7 +536,32 @@ product_family(const char *name)
 		return "Apple Watch";
 	if (strncmp(name, "Apple Vision", 12) == 0)
 		return "Apple Vision";
+	if (strncmp(name, "iPod", 4) == 0)
+		return "iPod";
 	return "Other";
+}
+
+/*
+ * Rank a product family in the order used by simctl when listing
+ * device types: iPhone, iPad, Apple TV, Apple Watch, Apple Vision,
+ * iPod, then anything unknown.
+ */
+static int
+family_rank(const char *family)
+{
+	if (strcmp(family, "iPhone") == 0)
+		return 0;
+	if (strcmp(family, "iPad") == 0)
+		return 1;
+	if (strcmp(family, "Apple TV") == 0)
+		return 2;
+	if (strcmp(family, "Apple Watch") == 0)
+		return 3;
+	if (strcmp(family, "Apple Vision") == 0)
+		return 4;
+	if (strcmp(family, "iPod") == 0)
+		return 5;
+	return 6;
 }
 
 void
@@ -491,11 +617,12 @@ list_devicetypes(int json_mode)
 	}
 	closedir(dir);
 
-	/* Sort by family, then name */
+	/* Sort by product family rank, then name */
 	for (int i = 0; i < count - 1; i++) {
 		for (int j = 0; j < count - i - 1; j++) {
 			int swap = 0;
-			int fc = strcmp(families[j], families[j + 1]);
+			int fc = family_rank(families[j]) -
+			    family_rank(families[j + 1]);
 			if (fc > 0)
 				swap = 1;
 			else if (fc == 0 && strcmp(names[j], names[j + 1]) > 0)
