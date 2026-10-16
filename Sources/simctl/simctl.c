@@ -150,12 +150,12 @@ main(int argc, char **argv)
 
 	if (subcommand == NULL && help_mode) {
 		simctl_help();
-		return 0;
+		return 1;
 	}
 
 	if (subcommand == NULL && opt_index >= argc) {
 		simctl_help();
-		return 0;
+		return 1;
 	}
 
 	/* Set up the arguments for the subcommand */
@@ -164,27 +164,14 @@ main(int argc, char **argv)
 
 	if (help_mode && subcommand == NULL) {
 		simctl_help();
-		return 0;
+		return 1;
 	}
 
 	if (subcommand != NULL && strcmp(subcommand, "help") == 0) {
 		if (sub_argc > 1) {
 			const char *sub = sub_args[1];
 			if (strcmp(sub, "list") == 0) {
-				printf(
-"List available devices, device types, runtimes, or device pairs.\n"
-"Usage: simctl list [-j | --json] [--json-fd=<fd>] [--json-output=<file path>]\n"
-"       [-e | --no-escape-slashes] [-v] [devices|devicetypes|runtimes|pairs]\n"
-"       [<search term>|available]\n"
-"-j     Print as JSON (optionally specify a file descriptor with --json-fd or file path with --json-output)\n"
-"-e     Encode slashes without escapes in JSON output\n"
-"-v     More verbose output\n"
-"\n"
-"Specify one of 'devices', 'devicetypes', 'runtimes', or 'pairs' to list only\n"
-"items of that type. If a type filter is specified you may also specify a search\n"
-"term. Search terms use a simple case-insensitive contains check against the\n"
-"item's description.\n"
-				);
+				list_usage(stderr);
 				return 0;
 			}
 		} else {
@@ -201,8 +188,7 @@ main(int argc, char **argv)
 
 	/* Dispatch to subcommands */
 	if (strcmp(subcommand, "list") == 0) {
-		list_dispatch(sub_argc, sub_args);
-		return 0;
+		return list_dispatch(sub_argc, sub_args);
 	} else if (strcmp(subcommand, "create") == 0) {
 		return sim_create(sub_argc, sub_args);
 	} else if (strcmp(subcommand, "boot") == 0 ||

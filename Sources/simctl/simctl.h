@@ -13,6 +13,8 @@
 
 #define SIMCTL_VERSION "0.1.0"
 
+#include <stdio.h>
+
 /* CoreSimulator data paths */
 #define CS_DEVICES_DIR    "Library/Developer/CoreSimulator/Devices"
 #define CS_PROFILES_DIR   "/Library/Developer/CoreSimulator/Profiles"
@@ -28,7 +30,7 @@
 extern const char *state_names[];
 
 /* Dispatch functions (implemented in simctl.c / sim_list.c / sim_ops.c) */
-extern void list_dispatch(int argc, char **argv);
+extern int  list_dispatch(int argc, char **argv);
 extern int  sim_create(int argc, char **argv);
 extern int  sim_boot_or_shutdown(const char *cmd, int argc, char **argv);
 extern int  sim_delete_erase(const char *cmd, int argc, char **argv);
@@ -42,7 +44,20 @@ extern int  sim_clone(int argc, char **argv);
 extern int  sim_openurl(int argc, char **argv);
 
 /* List functions (implemented in sim_list.c / sim_list_dispatch.c) */
-extern void list_devices(int json_mode, int verbose);
-extern void list_devicetypes(int json_mode);
-extern void list_runtimes(int json_mode);
-extern void list_pairs(int json_mode);
+/*
+ * Output modes accepted by the list_* functions. LIST_JSON emits a
+ * self-contained JSON document; LIST_JSON_MERGED emits just the
+ * section (key plus value) so the caller can fold several sections
+ * into a single JSON object, as `simctl list -j` does.
+ */
+#define LIST_PLAIN        0
+#define LIST_JSON         1
+#define LIST_JSON_MERGED  2
+
+extern void list_usage(FILE *out);
+extern void list_devices(int json_mode, int verbose, const char *term,
+    int available_only, int escape);
+extern void list_devicetypes(int json_mode, const char *term, int verbose,
+    int escape);
+extern void list_runtimes(int json_mode, const char *term, int escape);
+extern void list_pairs(int json_mode, const char *term, int escape);
