@@ -4,11 +4,10 @@
  * Copyright (c) 2026 Sunneva N. Mariu <sunnevanattsol@gmail.com>
  * SPDX-License-Identifier: BSD-3-Clause
  *
- * Command line utility to control the Simulator. Implements list, create,
- * boot, shutdown, delete, erase, install, uninstall, spawn, io, and
- * other subcommands. Read-only commands (list) are implemented natively
- * by reading CoreSimulator plist data; destructive/operational commands
- * delegate to the system simctl binary when available.
+ * Command line utility to control the Simulator. The read-only list
+ * and runtime commands are implemented natively by reading
+ * CoreSimulator plist data; all other subcommands delegate to the
+ * system simctl binary, which provides the CoreSimulator service.
  */
 
 #define SIMCTL_VERSION "0.1.0"
@@ -31,17 +30,6 @@ extern const char *state_names[];
 
 /* Dispatch functions (implemented in simctl.c / sim_list.c / sim_ops.c) */
 extern int  list_dispatch(int argc, char **argv);
-extern int  sim_create(int argc, char **argv);
-extern int  sim_boot_or_shutdown(const char *cmd, int argc, char **argv);
-extern int  sim_delete_erase(const char *cmd, int argc, char **argv);
-extern int  sim_install_uninstall(const char *cmd, int argc, char **argv);
-extern int  sim_spawn(int argc, char **argv);
-extern int  sim_io(int argc, char **argv);
-extern int  sim_location(int argc, char **argv);
-extern int  sim_push(int argc, char **argv);
-extern int  sim_rename(int argc, char **argv);
-extern int  sim_clone(int argc, char **argv);
-extern int  sim_openurl(int argc, char **argv);
 extern int  sim_delegate(int argc, char **argv);
 
 /* runtime subcommand (implemented in sim_runtime.c) */

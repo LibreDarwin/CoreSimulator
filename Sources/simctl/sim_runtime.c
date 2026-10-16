@@ -61,7 +61,7 @@ read_image_inventory(unsigned long long *count, unsigned long long *bytes)
 	int n = 0;
 	FILE *fp;
 	char buf[65536];
-	size_t got;
+	size_t got = 0;
 
 	*count = 0;
 	*bytes = 0;

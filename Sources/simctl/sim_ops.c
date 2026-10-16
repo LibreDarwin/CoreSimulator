@@ -1,17 +1,18 @@
 /*
- * sim_ops - simctl operational subcommands (create, boot, shutdown,
- * delete, erase, install, uninstall, spawn, io, location, push, rename,
- * clone, openurl).
+ * sim_ops - delegation helpers for subcommands that require the
+ * CoreSimulator service (create, boot, shutdown, install, io, ...).
  *
- * These commands require the CoreSimulator framework's XPC service, which
- * is a private framework not available to open-source reimplementations.
- * They delegate to the system simctl binary when available.
+ * Those operations need the CoreSimulator framework's private XPC
+ * service, which is not available to an open-source reimplementation,
+ * so they are handed to the system simctl binary. The read-only
+ * commands (list, runtime) are implemented natively elsewhere.
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #include "simctl.h"
 
@@ -40,7 +41,11 @@ find_system_simctl(void)
 
 /*
  * Delegate a command to the system simctl binary.
- * The subcommand and its arguments are passed through as-is.
+ *
+ * argv must be the caller's full argument vector (argv[0] is the
+ * simctl binary itself, argv[1] is the subcommand). subcommand is
+ * used only for the diagnostic message when the system binary is
+ * missing. The exit status of the delegated process is propagated.
  */
 static int
 delegate_to_system(int argc, char **argv, const char *subcommand)
@@ -60,154 +65,22 @@ delegate_to_system(int argc, char **argv, const char *subcommand)
 		pos += snprintf(cmd + pos, sizeof cmd - pos, " \"%s\"", argv[i]);
 	}
 
-	return system(cmd);
+	int status = system(cmd);
+	if (status == -1)
+		return 1;
+	if (WIFEXITED(status))
+		return WEXITSTATUS(status);
+	return 1;
 }
 
 /*
- * Delegate the current command (argv[0] is the reimplementation's
- * binary, argv[1] is the subcommand) to the system simctl binary.
- * Shared by subcommand implementations that cannot yet run natively.
+ * Delegate a subcommand to the system simctl binary. argv is the
+ * full argument vector; argv[1] names the subcommand. Used by
+ * subcommand implementations that cannot yet run natively.
  */
 int
 sim_delegate(int argc, char **argv)
 {
 	return delegate_to_system(argc, argv,
 	    (argc > 1 && argv[1] != NULL) ? argv[1] : "simctl");
-}
-
-/* --- create --- */
-int
-sim_create(int argc, char **argv)
-{
-	if (argc < 4) {
-		fprintf(stderr, "usage: simctl create <name> <device type id> "
-		    "[<runtime id>]\n");
-		return 1;
-	}
-	return delegate_to_system(argc, argv, "create");
-}
-
-/* --- boot / shutdown --- */
-int
-sim_boot_or_shutdown(const char *cmd, int argc, char **argv)
-{
-	if (argc < 2) {
-		fprintf(stderr, "usage: simctl %s <device>\n", cmd);
-		return 1;
-	}
-	return delegate_to_system(argc, argv, cmd);
-}
-
-/* --- delete / erase --- */
-int
-sim_delete_erase(const char *cmd, int argc, char **argv)
-{
-	if (argc < 2) {
-		fprintf(stderr, "usage: simctl %s <device> [... <device n>] | "
-		    "unavailable | all\n", cmd);
-		return 1;
-	}
-	return delegate_to_system(argc, argv, cmd);
-}
-
-/* --- install / uninstall --- */
-int
-sim_install_uninstall(const char *cmd, int argc, char **argv)
-{
-	if (strcmp(cmd, "install") == 0) {
-		if (argc < 3) {
-			fprintf(stderr, "usage: simctl install <device> "
-			    "<path>\n");
-			return 1;
-		}
-	} else {
-		if (argc < 3) {
-			fprintf(stderr, "usage: simctl uninstall <device> "
-			    "<bundle identifier>\n");
-			return 1;
-		}
-	}
-	return delegate_to_system(argc, argv, cmd);
-}
-
-/* --- spawn --- */
-int
-sim_spawn(int argc, char **argv)
-{
-	if (argc < 3) {
-		fprintf(stderr, "usage: simctl spawn <device> <path to "
-		    "executable> [<argv 1> ...]\n");
-		return 1;
-	}
-	return delegate_to_system(argc, argv, "spawn");
-}
-
-/* --- io --- */
-int
-sim_io(int argc, char **argv)
-{
-	if (argc < 3) {
-		fprintf(stderr, "usage: simctl io <device> <operation> "
-		    "[arguments]\n");
-		return 1;
-	}
-	return delegate_to_system(argc, argv, "io");
-}
-
-/* --- location --- */
-int
-sim_location(int argc, char **argv)
-{
-	if (argc < 3) {
-		fprintf(stderr, "usage: simctl location <device> <action> "
-		    "[arguments]\n");
-		return 1;
-	}
-	return delegate_to_system(argc, argv, "location");
-}
-
-/* --- push --- */
-int
-sim_push(int argc, char **argv)
-{
-	if (argc < 3) {
-		fprintf(stderr, "usage: simctl push <device> <bundle identifier> "
-		    "<json file>\n");
-		return 1;
-	}
-	return delegate_to_system(argc, argv, "push");
-}
-
-/* --- rename --- */
-int
-sim_rename(int argc, char **argv)
-{
-	if (argc < 3) {
-		fprintf(stderr, "usage: simctl rename <device> <name>\n");
-		return 1;
-	}
-	return delegate_to_system(argc, argv, "rename");
-}
-
-/* --- clone --- */
-int
-sim_clone(int argc, char **argv)
-{
-	if (argc < 3) {
-		fprintf(stderr, "usage: simctl clone <source> <new name> "
-		    "[<new udid>]\n");
-		return 1;
-	}
-	return delegate_to_system(argc, argv, "clone");
-}
-
-/* --- openurl --- */
-int
-sim_openurl(int argc, char **argv)
-{
-	if (argc < 3) {
-		fprintf(stderr, "usage: simctl openurl <device> <URL>\n");
-		return 1;
-	}
-	return delegate_to_system(argc, argv, "openurl");
 }

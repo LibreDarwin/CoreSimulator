@@ -186,64 +186,19 @@ main(int argc, char **argv)
 	/* Dispatch to subcommands */
 	if (strcmp(subcommand, "list") == 0) {
 		return list_dispatch(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "create") == 0) {
-		return sim_create(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "boot") == 0 ||
-	    strcmp(subcommand, "shutdown") == 0) {
-		return sim_boot_or_shutdown(subcommand, sub_argc, sub_args);
-	} else if (strcmp(subcommand, "delete") == 0 ||
-	    strcmp(subcommand, "erase") == 0) {
-		return sim_delete_erase(subcommand, sub_argc, sub_args);
-	} else if (strcmp(subcommand, "install") == 0 ||
-	    strcmp(subcommand, "uninstall") == 0) {
-		return sim_install_uninstall(subcommand, sub_argc, sub_args);
-	} else if (strcmp(subcommand, "spawn") == 0) {
-		return sim_spawn(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "io") == 0) {
-		return sim_io(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "location") == 0) {
-		return sim_location(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "push") == 0) {
-		return sim_push(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "rename") == 0) {
-		return sim_rename(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "clone") == 0) {
-		return sim_clone(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "openurl") == 0) {
-		return sim_openurl(sub_argc, sub_args);
-	} else if (strcmp(subcommand, "pbcopy") == 0 ||
-	    strcmp(subcommand, "pbpaste") == 0 ||
-	    strcmp(subcommand, "pbsync") == 0) {
-		return delegate_to_system(argc, argv);
-	} else if (strcmp(subcommand, "appinfo") == 0 ||
-	    strcmp(subcommand, "listapps") == 0) {
-		return delegate_to_system(argc, argv);
-	} else if (strcmp(subcommand, "privacy") == 0) {
-		return delegate_to_system(argc, argv);
 	} else if (strcmp(subcommand, "runtime") == 0) {
 		return sim_runtime(argc, argv);
-	} else if (strcmp(subcommand, "addmedia") == 0 ||
-	    strcmp(subcommand, "icloud_sync") == 0 ||
-	    strcmp(subcommand, "keychain") == 0 ||
-	    strcmp(subcommand, "launch") == 0 ||
-	    strcmp(subcommand, "logverbose") == 0 ||
-	    strcmp(subcommand, "pair") == 0 ||
-	    strcmp(subcommand, "pair_activate") == 0 ||
-	    strcmp(subcommand, "unpair") == 0 ||
-	    strcmp(subcommand, "status_bar") == 0 ||
-	    strcmp(subcommand, "terminate") == 0 ||
-	    strcmp(subcommand, "ui") == 0 ||
-	    strcmp(subcommand, "personalization") == 0 ||
-	    strcmp(subcommand, "get_app_container") == 0 ||
-	    strcmp(subcommand, "getenv") == 0 ||
-	    strcmp(subcommand, "install_app_data") == 0 ||
-	    strcmp(subcommand, "diagnose") == 0 ||
-	    strcmp(subcommand, "upgrade") == 0) {
-		return delegate_to_system(argc, argv);
-	} else {
-		fprintf(stderr, "Unrecognized subcommand: %s\n",
-		    subcommand);
-		simctl_help();
-		return 1;
 	}
+
+	/*
+	 * Every other subcommand requires the CoreSimulator service, so
+	 * delegate to the system simctl binary. This covers the
+	 * documented operational commands and the undocumented ones
+	 * (for example notify_post, notify_get_state, addphoto, pbinfo,
+	 * bootstatus, darwinup, legacyruntime, keyboard, and monitor).
+	 * For an unknown subcommand the system binary prints the
+	 * canonical "Unrecognized subcommand" message. Delegating the
+	 * full argv preserves global options such as --set/--profiles.
+	 */
+	return delegate_to_system(argc, argv);
 }
