@@ -178,6 +178,32 @@ plist_read_bool(const char *plist_path, const char *key)
 	return val;
 }
 
+/*
+ * Read the first element of the supportedProductFamilyIDs array from a
+ * profile plist, or -1 if it is absent. The first element is the device
+ * type's primary product family, which CoreSimulator's `list
+ * devicetypes` search matches against.
+ */
+static int
+plist_read_family_id(const char *plist_path)
+{
+	char cmd[2048];
+	snprintf(cmd, sizeof cmd,
+	    "/usr/bin/plutil -extract supportedProductFamilyIDs.0 raw "
+	    "-o - \"%s\" 2>/dev/null", plist_path);
+
+	FILE *f = popen(cmd, "r");
+	if (f == NULL)
+		return -1;
+
+	char line[64];
+	int val = -1;
+	if (fgets(line, sizeof line, f) != NULL)
+		val = atoi(line);
+	pclose(f);
+	return val;
+}
+
 /* Find the home directory */
 static const char *
 home_dir(void)
@@ -785,6 +811,30 @@ list_devices(int json_mode, int verbose, const char *term,
 /* --- list device types --- */
 
 /*
+ * Map a CoreSimulator product family identifier to the display name
+ * used by `list devicetypes` search. The identifiers are fixed by
+ * CoreSimulator; the iPod touch reports family 1 (iPhone).
+ */
+static const char *
+family_name_for_id(int id)
+{
+	switch (id) {
+	case 1:
+		return "iPhone";
+	case 2:
+		return "iPad";
+	case 3:
+		return "Apple TV";
+	case 4:
+		return "Apple Watch";
+	case 7:
+		return "Apple Vision";
+	default:
+		return "";
+	}
+}
+
+/*
  * Infer the product family reported by CoreSimulator from a device
  * name. Note that Apple folds the iPod touch into the "iPhone"
  * family, and reports Apple Vision separately.
@@ -899,8 +949,28 @@ list_devicetypes(int json_mode, const char *term, int verbose, int escape)
 		char *name = plist_read_string(info_path, "CFBundleName");
 		char *id = plist_read_string(info_path, "CFBundleIdentifier");
 
-		if (name && id && str_contains_ci(name, term) &&
-		    count < 512) {
+		/*
+		 * The reference implementation's search term is matched
+		 * against the device type's name, identifier, model
+		 * identifier, and primary product family name (in that
+		 * order, as a case-insensitive substring). It does not
+		 * match against productClass, chromeIdentifier, or
+		 * springBoardConfigName.
+		 */
+		char profile_path[1024];
+		snprintf(profile_path, sizeof profile_path,
+		    "%s/Contents/Resources/profile.plist", dt_path);
+		char *model = plist_read_string(profile_path, "modelIdentifier");
+		const char *fam_name =
+		    family_name_for_id(plist_read_family_id(profile_path));
+
+		int match = str_contains_ci(name, term) ||
+		    str_contains_ci(id, term) ||
+		    str_contains_ci(model, term) ||
+		    str_contains_ci(fam_name, term);
+		free(model);
+
+		if (name && id && match && count < 512) {
 			names[count] = name;
 			ids[count] = id;
 			bundles[count] = strdup(dt_path);

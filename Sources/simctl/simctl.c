@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 #include "simctl.h"
 
@@ -113,7 +114,12 @@ delegate_to_system(int argc, char **argv)
 		pos += snprintf(cmd + pos, sizeof cmd - pos, " \"%s\"", argv[i]);
 	}
 
-	return system(cmd);
+	int status = system(cmd);
+	if (status == -1)
+		return 1;
+	if (WIFEXITED(status))
+		return WEXITSTATUS(status);
+	return 1;
 }
 
 int
@@ -122,38 +128,36 @@ main(int argc, char **argv)
 	const char *subcommand = NULL;
 	char **sub_args = argv;
 	int sub_argc = argc;
-	int help_mode = 0;
 	int opt_index = 1;
 
-	/* Parse global options before the subcommand */
+	/*
+	 * Parse global options. Only long options (--set, --profiles,
+	 * --help) are recognized here; an unrecognized or incomplete long
+	 * option prints the help text. Tokens that do not begin with "--"
+	 * are treated as the subcommand, even when they begin with a
+	 * single dash, matching the reference implementation.
+	 */
 	while (opt_index < argc) {
 		if (strcmp(argv[opt_index], "--set") == 0 &&
 		    opt_index + 1 < argc) {
 			opt_index += 2;
-		} else if (strncmp(argv[opt_index], "--set=", 6) == 0) {
-			opt_index++;
 		} else if (strcmp(argv[opt_index], "--profiles") == 0 &&
 		    opt_index + 1 < argc) {
 			opt_index += 2;
-		} else if (strncmp(argv[opt_index], "--profiles=", 11) == 0) {
-			opt_index++;
-		} else if (strcmp(argv[opt_index], "-h") == 0 ||
-		    strcmp(argv[opt_index], "--help") == 0) {
-			help_mode = 1;
-			opt_index++;
+		} else if (strcmp(argv[opt_index], "--help") == 0) {
+			simctl_help();
+			return 1;
+		} else if (strncmp(argv[opt_index], "--", 2) == 0) {
+			simctl_help();
+			return 1;
 		} else {
-			/* First non-option argument is the subcommand */
+			/* First non-long-option argument is the subcommand */
 			subcommand = argv[opt_index];
 			break;
 		}
 	}
 
-	if (subcommand == NULL && help_mode) {
-		simctl_help();
-		return 1;
-	}
-
-	if (subcommand == NULL && opt_index >= argc) {
+	if (subcommand == NULL) {
 		simctl_help();
 		return 1;
 	}
@@ -161,11 +165,6 @@ main(int argc, char **argv)
 	/* Set up the arguments for the subcommand */
 	sub_args = argv + opt_index;
 	sub_argc = argc - opt_index;
-
-	if (help_mode && subcommand == NULL) {
-		simctl_help();
-		return 1;
-	}
 
 	if (subcommand != NULL && strcmp(subcommand, "help") == 0) {
 		if (sub_argc > 1) {
@@ -182,11 +181,6 @@ main(int argc, char **argv)
 			return 0;
 		}
 		return delegate_to_system(argc, argv);
-	}
-
-	if (subcommand == NULL) {
-		simctl_help();
-		return 0;
 	}
 
 	/* Dispatch to subcommands */
@@ -247,7 +241,7 @@ main(int argc, char **argv)
 	    strcmp(subcommand, "upgrade") == 0) {
 		return delegate_to_system(argc, argv);
 	} else {
-		fprintf(stderr, "simctl: unknown subcommand '%s'\n",
+		fprintf(stderr, "Unrecognized subcommand: %s\n",
 		    subcommand);
 		simctl_help();
 		return 1;
