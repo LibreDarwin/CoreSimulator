@@ -14,7 +14,7 @@ CFLAGS_SIMCTL := $(OPT) -std=c11 -D_DARWIN_C_SOURCE -isysroot "$(SDK)" -Isources
 CFLAGS_FRAME  := $(OPT) -fobjc-arc -isysroot "$(SDK)" -I$(shell pwd)/Sources/CoreSimulator -Wall -Wextra
 
 SIMCTL_BIN := $(BUILD_DIR)/simctl
-SIMCTL_OBJS := $(OBJDIR)/sim_list.o $(OBJDIR)/sim_list_dispatch.o $(OBJDIR)/sim_ops.o $(OBJDIR)/sim_runtime.o $(OBJDIR)/simctl.o
+SIMCTL_OBJS := $(OBJDIR)/sim_list.o $(OBJDIR)/sim_list_dispatch.o $(OBJDIR)/sim_ops.o $(OBJDIR)/sim_plist.o $(OBJDIR)/sim_runtime.o $(OBJDIR)/simctl.o
 
 FRAMEWORK_DIR := $(BUILD_DIR)/CoreSimulator.framework
 FRAME_OBJS := $(OBJDIR)/CoreSimulator.o $(OBJDIR)/SimServiceContext.o $(OBJDIR)/SimDeviceSet.o $(OBJDIR)/SimDevice.o $(OBJDIR)/SimDeviceType.o $(OBJDIR)/SimRuntime.o
@@ -40,6 +40,10 @@ $(OBJDIR)/sim_list_dispatch.o: Sources/simctl/sim_list_dispatch.c Sources/simctl
 $(OBJDIR)/sim_ops.o: Sources/simctl/sim_ops.c Sources/simctl/simctl.h
 	@mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS_SIMCTL) -c -o $@ Sources/simctl/sim_ops.c
+
+$(OBJDIR)/sim_plist.o: Sources/simctl/sim_plist.c Sources/simctl/sim_plist.h
+	@mkdir -p $(OBJDIR)
+	$(CC) $(CFLAGS_SIMCTL) -c -o $@ Sources/simctl/sim_plist.c
 
 $(OBJDIR)/sim_runtime.o: Sources/simctl/sim_runtime.c Sources/simctl/sim_runtime_usage.inc Sources/simctl/simctl.h
 	@mkdir -p $(OBJDIR)

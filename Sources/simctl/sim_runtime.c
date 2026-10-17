@@ -28,6 +28,7 @@
 #include <unistd.h>
 
 #include "simctl.h"
+#include "sim_plist.h"
 
 #include "sim_runtime_usage.inc"
 
@@ -48,9 +49,8 @@ runtime_usage(FILE *out)
 
 /*
  * Read the disk image inventory. Returns the number of images and the
- * total size in bytes. The inventory is a binary plist; plutil(8) is
- * used to extract the `images` array as JSON, which is then scanned
- * for the per-image `identifier` and `sizeBytes` fields.
+ * total size in bytes. The inventory is a binary plist; the `images`
+ * array is scanned for the per-image `sizeBytes` field.
  */
 static void
 read_image_inventory(unsigned long long *count, unsigned long long *bytes)
@@ -59,9 +59,7 @@ read_image_inventory(unsigned long long *count, unsigned long long *bytes)
 	const char *home = getenv("HOME");
 	const char *candidates[3];
 	int n = 0;
-	FILE *fp;
-	char buf[65536];
-	size_t got = 0;
+	plist *root = NULL;
 
 	*count = 0;
 	*bytes = 0;
@@ -73,40 +71,27 @@ read_image_inventory(unsigned long long *count, unsigned long long *bytes)
 	candidates[n++] = IMAGES_DIR_SYSTEM;
 
 	for (int i = 0; i < n; i++) {
-		char cmd[1200];
 		if (access(candidates[i], R_OK) != 0)
 			continue;
-		snprintf(cmd, sizeof cmd,
-		    "plutil -extract images json -o - \"%s\" 2>/dev/null",
-		    candidates[i]);
-		fp = popen(cmd, "r");
-		if (fp == NULL)
-			continue;
-		got = fread(buf, 1, sizeof buf - 1, fp);
-		pclose(fp);
-		buf[got] = '\0';
-		break;
+		root = plist_load_file(candidates[i]);
+		if (root != NULL)
+			break;
 	}
-	if (got == 0)
+	if (root == NULL)
 		return;
 
-	/*
-	 * Count objects in the array. Every disk image record carries an
-	 * `identifier` key; summing its occurrences across the extracted
-	 * array yields the image count.
-	 */
-	for (const char *p = buf; (p = strstr(p, "\"identifier\"")) != NULL;
-	    p += 12)
-		(*count)++;
+	plist *images = plist_dict_get(root, "images");
 
-	for (const char *p = buf; (p = strstr(p, "\"sizeBytes\"")) != NULL;
-	    p += 11) {
-		const char *q = p + 11;
-		while (*q == ' ' || *q == '\t' || *q == ':')
-			q++;
-		if (*q >= '0' && *q <= '9')
-			*bytes += strtoull(q, NULL, 10);
+	if (images != NULL && images->type == PLIST_ARRAY) {
+		*count = images->count;
+		for (size_t i = 0; i < images->count; i++) {
+			plist *img = images->items[i];
+			plist *sz = plist_dict_get(img, "sizeBytes");
+
+			*bytes += (unsigned long long)plist_as_int(sz, 0);
+		}
 	}
+	plist_free(root);
 }
 
 /*
