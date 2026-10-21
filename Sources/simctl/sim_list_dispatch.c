@@ -85,6 +85,7 @@ list_dispatch(int argc, char **argv)
 		{ "json-fd",           required_argument, NULL, 0x100 },
 		{ "json-output",       required_argument, NULL, 0x101 },
 		{ "no-escape-slashes", no_argument,       NULL, 'e' },
+		{ "verbose",           no_argument,       NULL, 'v' },
 		{ NULL,                0,                 NULL, 0 }
 	};
 	int json_mode = 0;
