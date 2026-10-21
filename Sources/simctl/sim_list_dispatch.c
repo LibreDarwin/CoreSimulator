@@ -57,7 +57,7 @@ list_type_dispatch(const char *type, int json_mode, int verbose,
 {
 	int available_only = term != NULL &&
 	    strcmp(type, "devices") == 0 &&
-	    strcasecmp(term, "available") == 0;
+	    strcmp(term, "available") == 0;
 
 	if (strcmp(type, "devices") == 0) {
 		list_devices(json_mode, verbose, term, available_only,

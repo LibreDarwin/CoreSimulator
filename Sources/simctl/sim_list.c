@@ -308,19 +308,22 @@ dir_allocated_size(const char *path)
 
 /*
  * Decide whether a single device survives the optional search term or
- * the special "available" filter. Apple treats "available" as a magic
- * search term that selects only available devices; any other term is a
- * case-insensitive substring check against the device name.
+ * one of the special filters. Apple treats the exact, case-sensitive
+ * terms "available" and "unavailable" as magic filters that select
+ * devices by availability; any other term is a case-insensitive
+ * substring check against the device name or UDID.
  */
 static int
-device_match(const char *name, int available, const char *term,
-    int available_only)
+device_match(const char *name, const char *udid, int available,
+    const char *term, int available_only)
 {
 	if (available_only)
 		return available;
-	if (term != NULL)
-		return str_contains_ci(name, term);
-	return 1;
+	if (term == NULL)
+		return 1;
+	if (strcmp(term, "unavailable") == 0)
+		return !available;
+	return str_contains_ci(name, term) || str_contains_ci(udid, term);
 }
 
 /* --- list devices --- */
@@ -504,7 +507,7 @@ list_devices(int json_mode, int verbose, const char *term,
 					    strcmp(runtimes[j],
 					    runtimes[i]) != 0)
 						continue;
-					if (device_match(names[j],
+					if (device_match(names[j], udids[j],
 					    is_avail[j] && rt_avail, term,
 					    available_only)) {
 						emitted = 1;
@@ -526,8 +529,8 @@ list_devices(int json_mode, int verbose, const char *term,
 				    strcmp(runtimes[j], runtimes[i]) != 0)
 					continue;
 				int available = is_avail[j] && rt_avail;
-				if (!device_match(names[j], available, term,
-				    available_only))
+				if (!device_match(names[j], udids[j],
+				    available, term, available_only))
 					continue;
 				if (!first)
 					printf(",\n");
@@ -627,7 +630,7 @@ list_devices(int json_mode, int verbose, const char *term,
 					    strcmp(runtimes[j],
 					    runtimes[i]) != 0)
 						continue;
-					if (device_match(names[j],
+					if (device_match(names[j], udids[j],
 					    is_avail[j] && rt_avail, term,
 					    available_only)) {
 						emitted = 1;
@@ -653,7 +656,7 @@ list_devices(int json_mode, int verbose, const char *term,
 				if (runtimes[j] == NULL ||
 				    strcmp(runtimes[j], runtimes[i]) != 0)
 					continue;
-				if (!device_match(names[j],
+				if (!device_match(names[j], udids[j],
 				    is_avail[j] && rt_avail, term,
 				    available_only))
 					continue;
