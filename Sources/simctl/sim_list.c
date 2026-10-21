@@ -335,11 +335,18 @@ device_match(const char *name, const char *udid, int available,
  * immediate children are device bundles.
  */
 static const char *device_root_override;
+static const char *profiles_root_override;
 
 void
 list_set_device_root(const char *path)
 {
 	device_root_override = path;
+}
+
+void
+list_set_profiles_root(const char *path)
+{
+	profiles_root_override = path;
 }
 
 void
@@ -783,25 +790,29 @@ dev_order_index(const char *identifier)
 	return kSimDeviceDefaultOrderCount + dt_order_index(identifier);
 }
 
-void
-list_devicetypes(int json_mode, const char *term, int verbose, int escape)
+/*
+ * Collect the device types found in `root` (a directory holding
+ * .simdevicetype bundles). Matching entries are appended to the caller's
+ * arrays; an identifier already present in `ids` is skipped so device
+ * types discovered in the standard profiles directory take precedence
+ * over identically-identified bundles in a custom profiles directory.
+ * Returns 1 if any collected identifier is not in Apple's canonical
+ * order table, 0 otherwise.
+ */
+static int
+collect_devicetypes(const char *root, const char *term, int *count,
+    char *names[], char *ids[], char *bundles[],
+    const char *families[])
 {
 	char buf[1024];
-	snprintf(buf, sizeof buf, "%s/DeviceTypes", CS_PROFILES_DIR);
+	snprintf(buf, sizeof buf, "%s/DeviceTypes", root);
 
 	DIR *dir = opendir(buf);
-	if (dir == NULL) {
-		fprintf(stderr, "simctl: no device types directory\n");
-		return;
-	}
+	if (dir == NULL)
+		return 0;
 
+	int unknown = 0;
 	struct dirent *entry;
-	int count = 0;
-	char *names[512];
-	char *ids[512];
-	char *bundles[512];
-	const char *families[512];
-
 	while ((entry = readdir(dir)) != NULL) {
 		if (entry->d_name[0] == '.')
 			continue;
@@ -844,18 +855,73 @@ list_devicetypes(int json_mode, const char *term, int verbose, int escape)
 		    str_contains_ci(fam_name, term);
 		free(model);
 
-		if (name && id && match && count < 512) {
-			names[count] = name;
-			ids[count] = id;
-			bundles[count] = strdup(dt_path);
-			families[count] = product_family(name);
-			count++;
+		int dup = 0;
+		if (name && id) {
+			for (int i = 0; i < *count; i++) {
+				if (strcmp(ids[i], id) == 0) {
+					dup = 1;
+					break;
+				}
+			}
+			if (dt_order_index(id) == kSimDeviceTypeOrderCount)
+				unknown = 1;
+		}
+
+		if (name && id && match && !dup && *count < 512) {
+			names[*count] = name;
+			ids[*count] = id;
+			bundles[*count] = strdup(dt_path);
+			families[*count] = product_family(name);
+			(*count)++;
 		} else {
 			free(name);
 			free(id);
 		}
 	}
 	closedir(dir);
+	return unknown;
+}
+
+/*
+ * Apple merges a custom profiles directory additively on top of the
+ * standard one. Ordering of device types whose identifiers are absent
+ * from the canonical table cannot be reproduced, so callers fall back to
+ * the reference implementation when such a type is present.
+ */
+int
+list_profiles_has_unknown(const char *path)
+{
+	char *names[512];
+	char *ids[512];
+	char *bundles[512];
+	const char *families[512];
+	int count = 0;
+
+	int unknown = collect_devicetypes(path, NULL, &count, names, ids,
+	    bundles, families);
+
+	for (int i = 0; i < count; i++) {
+		free(names[i]);
+		free(ids[i]);
+		free(bundles[i]);
+	}
+	return unknown;
+}
+
+void
+list_devicetypes(int json_mode, const char *term, int verbose, int escape)
+{
+	int count = 0;
+	char *names[512];
+	char *ids[512];
+	char *bundles[512];
+	const char *families[512];
+
+	collect_devicetypes(CS_PROFILES_DIR, term, &count, names, ids,
+	    bundles, families);
+	if (profiles_root_override != NULL)
+		collect_devicetypes(profiles_root_override, term, &count,
+		    names, ids, bundles, families);
 
 	/*
 	 * Sort by Apple's canonical device type order. Identifiers not

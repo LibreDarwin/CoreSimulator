@@ -223,12 +223,18 @@ main(int argc, char **argv)
 	/* Dispatch to subcommands */
 	if (strcmp(subcommand, "list") == 0) {
 		/*
-		 * A custom profiles directory is not modelled natively, so
-		 * delegate to the reference implementation (the path has
-		 * already been validated above).
+		 * A custom profiles directory is merged additively with
+		 * the standard one. Device types whose identifiers are
+		 * not in Apple's canonical order table cannot be placed
+		 * like the reference implementation, so fall back to it
+		 * in that case (the path has already been validated
+		 * above).
 		 */
-		if (profiles_path != NULL)
-			return delegate_to_system(argc, argv);
+		if (profiles_path != NULL) {
+			if (list_profiles_has_unknown(profiles_path))
+				return delegate_to_system(argc, argv);
+			list_set_profiles_root(profiles_path);
+		}
 
 		/*
 		 * `--set <path>` selects the device directory. The

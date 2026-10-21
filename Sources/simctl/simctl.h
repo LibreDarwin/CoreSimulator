@@ -62,3 +62,15 @@ extern void list_pairs(int json_mode, const char *term, int escape);
  * $HOME/Library/Developer/CoreSimulator/Devices root.
  */
 extern void list_set_device_root(const char *path);
+
+/*
+ * `simctl --profiles <path>` adds a custom profiles directory on top of
+ * the standard /Library/Developer/CoreSimulator/Profiles. Bundle paths
+ * are merged with the standard set (identically-identified bundles in
+ * the standard directory win). Device types whose identifiers are not in
+ * the canonical order table cannot be ordered like the reference
+ * implementation, so `list_profiles_has_unknown` reports whether such a
+ * type exists (callers then delegate).
+ */
+extern void list_set_profiles_root(const char *path);
+extern int list_profiles_has_unknown(const char *path);
