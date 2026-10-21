@@ -42,39 +42,64 @@ list_usage(FILE *out)
 	    , out);
 }
 
+/*
+ * Canonical section order for the type filter. The reference
+ * implementation prints matching sections in this fixed order
+ * regardless of the order the types were named on the command line.
+ */
+enum {
+	LT_DEVICETYPES = 0,
+	LT_RUNTIMES,
+	LT_DEVICES,
+	LT_PAIRS,
+	LT_COUNT
+};
+
+/*
+ * JSON key order. The reference implementation builds its JSON document
+ * from a hash map keyed by section name, so the order of the "devicetypes",
+ * "runtimes", "devices" and "pairs" keys depends only on which sections
+ * are present (not on argument order). Plain output, by contrast, always
+ * uses the fixed canonical order above. This table records the observed
+ * key order for each of the 16 possible section subsets, indexed by a
+ * bitmask (devicetypes=1, runtimes=2, devices=4, pairs=8); unused slots
+ * are -1.
+ */
+static const signed char json_section_order[16][4] = {
+	[0]  = { -1, -1, -1, -1 },
+	[1]  = { LT_DEVICETYPES, -1, -1, -1 },
+	[2]  = { LT_RUNTIMES, -1, -1, -1 },
+	[4]  = { LT_DEVICES, -1, -1, -1 },
+	[8]  = { LT_PAIRS, -1, -1, -1 },
+	[3]  = { LT_DEVICETYPES, LT_RUNTIMES, -1, -1 },
+	[5]  = { LT_DEVICETYPES, LT_DEVICES, -1, -1 },
+	[9]  = { LT_DEVICETYPES, LT_PAIRS, -1, -1 },
+	[6]  = { LT_DEVICES, LT_RUNTIMES, -1, -1 },
+	[10] = { LT_PAIRS, LT_RUNTIMES, -1, -1 },
+	[12] = { LT_DEVICES, LT_PAIRS, -1, -1 },
+	[7]  = { LT_DEVICETYPES, LT_RUNTIMES, LT_DEVICES, -1 },
+	[11] = { LT_DEVICETYPES, LT_RUNTIMES, LT_PAIRS, -1 },
+	[13] = { LT_DEVICETYPES, LT_DEVICES, LT_PAIRS, -1 },
+	[14] = { LT_DEVICES, LT_RUNTIMES, LT_PAIRS, -1 },
+	[15] = { LT_DEVICETYPES, LT_RUNTIMES, LT_DEVICES, LT_PAIRS }
+};
+
+/*
+ * Return the section index for a type name, or -1 if the name is not a
+ * recognized type.
+ */
 static int
-is_list_type(const char *s)
+list_type_index(const char *s)
 {
-	return strcmp(s, "devices") == 0 ||
-	    strcmp(s, "devicetypes") == 0 ||
-	    strcmp(s, "runtimes") == 0 ||
-	    strcmp(s, "pairs") == 0;
-}
-
-static void
-list_type_dispatch(const char *type, int json_mode, int verbose,
-    const char *term, int escape)
-{
-	int available_only = term != NULL &&
-	    strcmp(type, "devices") == 0 &&
-	    strcmp(term, "available") == 0;
-
-	if (strcmp(type, "devices") == 0) {
-		list_devices(json_mode, verbose, term, available_only,
-		    escape);
-	} else if (strcmp(type, "devicetypes") == 0) {
-		if (!json_mode)
-			printf("== Device Types ==\n");
-		list_devicetypes(json_mode, term, verbose, escape);
-	} else if (strcmp(type, "runtimes") == 0) {
-		if (!json_mode)
-			printf("== Runtimes ==\n");
-		list_runtimes(json_mode, term, escape);
-	} else if (strcmp(type, "pairs") == 0) {
-		if (!json_mode)
-			printf("== Device Pairs ==\n");
-		list_pairs(json_mode, term, escape);
-	}
+	if (strcmp(s, "devicetypes") == 0)
+		return LT_DEVICETYPES;
+	if (strcmp(s, "runtimes") == 0)
+		return LT_RUNTIMES;
+	if (strcmp(s, "devices") == 0)
+		return LT_DEVICES;
+	if (strcmp(s, "pairs") == 0)
+		return LT_PAIRS;
+	return -1;
 }
 
 int
@@ -93,8 +118,9 @@ list_dispatch(int argc, char **argv)
 	int escape = 1;
 	int json_fd = -1;
 	const char *json_output = NULL;
-	const char *list_type = NULL;
 	const char *term = NULL;
+	int selected[LT_COUNT] = { 0, 0, 0, 0 };
+	int any_type = 0;
 	int c;
 
 	/*
@@ -132,17 +158,24 @@ list_dispatch(int argc, char **argv)
 		}
 	}
 
+	/*
+	 * Positional arguments select sections and (optionally) a search
+	 * term. A type name adds its section to the filter; the first
+	 * positional must be a type, and at most one non-type token (the
+	 * search term) may follow it. Any other shape is a usage error.
+	 */
 	for (int i = optind; i < argc; i++) {
 		const char *arg = argv[i];
+		int idx = list_type_index(arg);
 
-		if (list_type == NULL && is_list_type(arg)) {
-			list_type = arg;
-		} else if (term == NULL) {
-			term = arg;
-		} else {
-			/* Too many positional arguments. */
+		if (idx >= 0) {
+			selected[idx] = 1;
+			any_type = 1;
+		} else if (!any_type || term != NULL) {
 			list_usage(stderr);
 			return LIST_USAGE_EXIT;
+		} else {
+			term = arg;
 		}
 	}
 
@@ -172,49 +205,68 @@ list_dispatch(int argc, char **argv)
 	}
 
 	/*
-	 * A search term without a type, or no arguments at all, is
-	 * handled specially. A bare "list" prints every section; a
-	 * term without a type is a usage error.
+	 * With no type filter every section is selected (a bare "list").
+	 * Otherwise only the named sections are printed, in the fixed
+	 * canonical order rather than argument order.
 	 */
-	if (list_type == NULL) {
-		if (term != NULL) {
-			list_usage(stderr);
-			return LIST_USAGE_EXIT;
-		}
+	int show_types = !any_type || selected[LT_DEVICETYPES];
+	int show_runtimes = !any_type || selected[LT_RUNTIMES];
+	int show_devices = !any_type || selected[LT_DEVICES];
+	int show_pairs = !any_type || selected[LT_PAIRS];
+	int available_only = show_devices && term != NULL &&
+	    strcmp(term, "available") == 0;
 
-		/*
-		 * Bare "list": sections are emitted in the framework's
-		 * canonical order, which differs from the argument order
-		 * used elsewhere. In JSON mode all four sections are
-		 * folded into a single object.
-		 */
-		if (json_mode) {
-			printf("{\n");
-			list_devicetypes(LIST_JSON_MERGED, NULL, verbose, escape);
-			printf(",\n");
-			list_runtimes(LIST_JSON_MERGED, NULL, escape);
-			printf(",\n");
-			list_devices(LIST_JSON_MERGED, verbose, NULL, 0,
-			    escape);
-			printf(",\n");
-			list_pairs(LIST_JSON_MERGED, NULL, escape);
-			printf("\n}\n");
-			return 0;
-		}
+	if (json_mode) {
+		int mask = 0;
+		if (show_types)
+			mask |= 1;
+		if (show_runtimes)
+			mask |= 2;
+		if (show_devices)
+			mask |= 4;
+		if (show_pairs)
+			mask |= 8;
 
-		printf("== Device Types ==\n");
-		list_devicetypes(LIST_PLAIN, NULL, verbose, escape);
-		printf("== Runtimes ==\n");
-		list_runtimes(LIST_PLAIN, NULL, escape);
-		printf("== Devices ==\n");
-		list_devices(LIST_PLAIN, verbose, NULL, 0, escape);
-		printf("== Device Pairs ==\n");
-		list_pairs(LIST_PLAIN, NULL, escape);
+		int printed = 0;
+		printf("{\n");
+		for (int k = 0; k < 4; k++) {
+			int sec = json_section_order[mask][k];
+			if (sec < 0)
+				continue;
+			if (printed)
+				printf(",\n");
+			if (sec == LT_DEVICETYPES)
+				list_devicetypes(LIST_JSON_MERGED, term,
+				    verbose, escape);
+			else if (sec == LT_RUNTIMES)
+				list_runtimes(LIST_JSON_MERGED, term, escape);
+			else if (sec == LT_DEVICES)
+				list_devices(LIST_JSON_MERGED, verbose, term,
+				    available_only, escape);
+			else
+				list_pairs(LIST_JSON_MERGED, term, escape);
+			printed++;
+		}
+		printf("\n}\n");
 		return 0;
 	}
 
-	if (!json_mode && strcmp(list_type, "devices") == 0)
+	if (show_types) {
+		printf("== Device Types ==\n");
+		list_devicetypes(LIST_PLAIN, term, verbose, escape);
+	}
+	if (show_runtimes) {
+		printf("== Runtimes ==\n");
+		list_runtimes(LIST_PLAIN, term, escape);
+	}
+	if (show_devices) {
 		printf("== Devices ==\n");
-	list_type_dispatch(list_type, json_mode, verbose, term, escape);
+		list_devices(LIST_PLAIN, verbose, term, available_only,
+		    escape);
+	}
+	if (show_pairs) {
+		printf("== Device Pairs ==\n");
+		list_pairs(LIST_PLAIN, term, escape);
+	}
 	return 0;
 }

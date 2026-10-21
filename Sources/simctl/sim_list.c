@@ -29,8 +29,14 @@ static int dev_order_index(const char *identifier);
 static int
 str_contains_ci(const char *haystack, const char *needle)
 {
-	if (needle == NULL || needle[0] == '\0')
+	if (needle == NULL)
 		return 1;
+	/*
+	 * An empty search term (an explicit "" argument) matches
+	 * nothing, unlike an absent term which matches everything.
+	 */
+	if (needle[0] == '\0')
+		return 0;
 	if (haystack == NULL)
 		return 0;
 
