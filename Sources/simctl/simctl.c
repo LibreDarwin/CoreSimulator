@@ -20,6 +20,8 @@
 
 #include "simctl.h"
 
+#include "sim_help.inc"
+
 /* Help text matching real simctl's help output */
 static void
 simctl_help(void)
@@ -188,20 +190,34 @@ main(int argc, char **argv)
 			    set_path);
 			return 1;
 		}
-		if (sub_argc > 1) {
-			const char *sub = sub_args[1];
-			if (strcmp(sub, "list") == 0) {
-				list_usage(stderr);
-				return 0;
-			} else if (strcmp(sub, "runtime") == 0) {
-				runtime_usage(stderr);
-				return 0;
-			}
-		} else {
+		if (sub_argc <= 1) {
 			simctl_help();
 			return 0;
 		}
-		return delegate_to_system(argc, argv);
+
+		{
+			const char *sub = sub_args[1];
+			const char *text;
+
+			if (strcmp(sub, "list") == 0) {
+				list_usage(stderr);
+				return 0;
+			}
+			if (strcmp(sub, "runtime") == 0) {
+				runtime_usage(stderr);
+				return 0;
+			}
+
+			text = sim_help_lookup(sub);
+			if (text != NULL) {
+				fputs(text, stderr);
+				return 0;
+			}
+
+			/* Unknown subcommand: the help-for-help usage, rc 117. */
+			fputs(sim_help_lookup("help"), stderr);
+			return 117;
+		}
 	}
 
 	/* Dispatch to subcommands */
